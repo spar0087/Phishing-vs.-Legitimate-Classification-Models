@@ -1,0 +1,628 @@
+# FIT3152 Data Analytics <br> Assignment2
+
+#### - Se Eun Park (32722303)
+
+The following packages has been imported and utilized in this report:
+
+-   library(tree), library(e1071), library(adabag), library(randomForest), library(ROCR), library(rpart), library(neuralnet), library(caret)
+
+My individual data, **PD** consists of 2,000 rows of data of 26 variables(attributes).
+
+```{r}
+rm(list = ls())
+Phish <- read.csv("PhishingData.csv")
+set.seed(32722303) # Your Student ID is the random seed
+L <- as.data.frame(c(1:50))
+L <- L[sample(nrow(L), 10, replace = FALSE),]
+Phish <- Phish[(Phish$A01 %in% L),]
+PD <- Phish[sample(nrow(Phish), 2000, replace = FALSE),] # sample of 2000 rows
+```
+
+### 1.
+
+As shown in Appendix 1.0, the data structure of the PD data consists of 2000 rows and 26 variables, including integer (int) and float (num) values describing various website features. The last column, Class, indicates whether a website is phishing (1) or legitimate (0). Attributes A08, A22, and A24 are floats, whereas A03, A06, A07, A09, A10, A15, A16, A20, and Class comprise binomial values, exclusively encompassing 0 or 1.There are 417 rows with at least one NA value (Appendix 1.1).
+
+The proportion of phishing to legitimate sites is 0.5516, indicating a well-balanced distribution (Appendix 1.2). Notably, attributes A01, A12, A18, and A23 exhibit high standard deviations and variances, indicating significant variability (Appendix 1.3). For instance, A12 has an standard deviation of 146.0580 and a variance of 21332.9438, reflecting a wide spread in its data points.
+
+### 2.
+
+I have removed all the rows containing NA values to keep the analysis reliable. Although more than 20% of the websites listed in PD has missing values, I have decided to remove them rather than imputating them, as what the attributes are representing is unknown, and consequently their importance are unknown. Now, I will be using PD_clean data for my analysis.
+
+```{r}
+PD_clean <- na.omit(PD)
+```
+
+### 3.
+
+Before dividing my data into training and test data, I have made the Class attribute as a factor for classification processes.
+
+```{r}
+PD_clean$Class <- as.factor(PD_clean$Class)
+
+set.seed(32722303) #Student ID as random seed
+train.row = sample(1:nrow(PD_clean), 0.7*nrow(PD_clean))
+PD_clean.train = PD_clean[train.row,]
+PD_clean.test = PD_clean[-train.row,]
+```
+
+### 4.
+
+-   Decision Tree
+
+    ```{r}
+    library(tree)
+    PD_clean.tree = tree(Class ~., data = PD_clean.train)
+    plot(PD_clean.tree)
+    text(PD_clean.tree, pretty = 0)
+    ```
+
+<!-- -->
+
+-   Naïve Bayes
+
+    ```{r}
+    library(e1071)
+    PD_clean.bayes = naiveBayes(Class ~. , data = PD_clean.train)
+    ```
+
+-   Bagging
+
+    ```{r}
+    library(adabag)
+    PD_clean.bag <- bagging(Class ~. , data = PD_clean.train, mfinal=5)
+    ```
+
+-   Boosting
+
+    ```{r}
+    PD_clean.boost <- boosting(Class ~. , data = PD_clean.train, mfinal=10)
+    ```
+
+-   Random Forest
+
+    ```{r}
+    library(randomForest)
+    PD_clean.rf <- randomForest(Class ~. , data = PD_clean.train, na.action = na.exclude)
+    ```
+
+### 5.
+
+-   Decision Tree
+
+    Code can be found in Appendix 5.0
+
+    ```{r echo=FALSE}
+    PD_clean.predtree = predict(PD_clean.tree, PD_clean.test, type = "class")
+    tree_confusion= table(Predicted_Class = PD_clean.predtree, Actual_Class = PD_clean.test$Class)
+    cat("\nDecision Tree Confusion\n")
+    print(tree_confusion)
+
+    # Accuracy
+    tree_accuracy <- sum(diag(tree_confusion)) / sum(tree_confusion)
+    print(paste("Accuracy:", round(tree_accuracy, 4)))
+    ```
+
+<!-- -->
+
+-   Naïve Bayes
+
+    Code can be found in Appendix 5.1
+
+    ```{r echo=FALSE}
+    PD_clean.predbayes = predict(PD_clean.bayes, PD_clean.test)
+    bayes_confusion =table(Predicted_Class = PD_clean.predbayes, Actual_Class = PD_clean.test$Class)
+    cat("\nNaive Bayes Confusion\n")
+    print(bayes_confusion)
+
+    # Accuracy
+    bayes_accuracy <- sum(diag(bayes_confusion)) / sum(bayes_confusion)
+    print(paste("Accuracy:", round(bayes_accuracy, 4)))
+    ```
+
+-   Bagging
+
+    Code can be found in Appendix 5.2
+
+    ```{r echo=FALSE}
+    PD_cleanpred.bag <- predict.bagging(PD_clean.bag, PD_clean.test)
+    cat("\nBagging Confusion\n")
+    print(PD_cleanpred.bag$confusion)
+
+    # Accuracy
+    bag_confusion <- PD_cleanpred.bag$confusion
+    bag_accuracy <- sum(diag(bag_confusion)) / sum(bag_confusion)
+    print(paste("Accuracy:", round(bag_accuracy, 4)))
+    ```
+
+-   Boosting
+
+    Code can be found in Appendix 5.3
+
+    ```{r echo=FALSE}
+    PD_cleanpred.boost <- predict.boosting(PD_clean.boost, newdata=PD_clean.test)
+    cat("\nBoosting Confusion\n")
+    print(PD_cleanpred.boost$confusion)
+
+    # Accuracy
+    boost_confusion <- PD_cleanpred.boost$confusion
+    boost_accuracy <- sum(diag(boost_confusion)) / sum(boost_confusion)
+    print(paste("Accuracy:", round(boost_accuracy, 4)))
+    ```
+
+-   Random Forest
+
+    Code can be found in Appendix 5.4
+
+    ```{r echo=FALSE}
+    PD_cleanpredrf <- predict(PD_clean.rf, PD_clean.test)
+    rf_confusion=table(Predicted_Class = PD_cleanpredrf, Actual_Class = PD_clean.test$Class)
+    cat("\nRandom Forest Confusion\n")
+    print(rf_confusion)
+
+    # Calculate accuracy
+    rf_accuracy <- sum(diag(rf_confusion)) / sum(rf_confusion)
+    print(paste("Accuracy:", round(rf_accuracy, 4)))
+    ```
+
+### 6.
+
+```{r echo=TRUE}
+library(ROCR)
+
+# Decision Tree
+PD_clean.pred.tree = predict(PD_clean.tree, PD_clean.test, type = "vector")
+PD_cleanDpred <- prediction(PD_clean.pred.tree[,2], PD_clean.test$Class)
+PD_cleanDperf <- performance(PD_cleanDpred,"tpr","fpr")
+PD_cleanDAUC <- performance(PD_cleanDpred, "auc")@y.values[[1]]
+plot(PD_cleanDperf, col = "orange")
+abline(0,1)
+
+# Naive Bayes
+PD_clean.pred.bayes = predict(PD_clean.bayes, PD_clean.test, type = 'raw')
+PD_cleanBpred <- prediction( PD_clean.pred.bayes[,2], PD_clean.test$Class)
+PD_cleanBperf <- performance(PD_cleanBpred,"tpr","fpr")
+PD_cleanBAUC <- performance(PD_cleanBpred, "auc")@y.values[[1]]
+plot(PD_cleanBperf, add=TRUE, col = "blueviolet")
+
+# Bagging
+PD_cleanBagpred <- prediction(PD_cleanpred.bag$prob[,2], PD_clean.test$Class)
+PD_cleanBagperf <- performance(PD_cleanBagpred,"tpr","fpr")
+PD_cleanBagAUC <- performance(PD_cleanBagpred, "auc")@y.values[[1]]
+plot(PD_cleanBagperf, add=TRUE, col = "blue")
+
+# Boosting
+PD_cleanBoostpred <- prediction( PD_cleanpred.boost$prob[,2], PD_clean.test$Class)
+PD_cleanBoostperf <- performance(PD_cleanBoostpred,"tpr","fpr")
+PD_cleanBoostAUC <- performance(PD_cleanBoostpred, "auc")@y.values[[1]]
+plot(PD_cleanBoostperf, add=TRUE, col = "darkred")
+
+# Random Forest
+PD_cleanpred.rf <- predict(PD_clean.rf, PD_clean.test, type="prob")
+PD_cleanFpred <- prediction( PD_cleanpred.rf[,2], PD_clean.test$Class)
+PD_cleanFperf <- performance(PD_cleanFpred,"tpr","fpr")
+PD_cleanFAUC <- performance(PD_cleanFpred, "auc")@y.values[[1]]
+plot(PD_cleanFperf, add=TRUE, col = "darkgreen")
+
+legend("bottomright",
+       legend = c("Decision Tree", "Naive Bayes", "Bagging", "Boosting", "Random Forest"),
+       col = c("orange", "blueviolet", "blue", "darkred", "darkgreen"),
+       lty = 1, cex = 0.8)
+```
+
+### 7.
+
+Code can be found in Appendix 7.0
+
+```{r echo=FALSE}
+comparison <- data.frame(
+  Classifier = c("Decision Tree", "Naive Bayes", "Bagging", "Boosting", "Random Forest"),
+  Accuracy = c(tree_accuracy, bayes_accuracy, bag_accuracy, boost_accuracy, rf_accuracy),
+  AUC = c(PD_cleanDAUC, PD_cleanBAUC, PD_cleanBagAUC, PD_cleanBoostAUC, PD_cleanFAUC))
+
+print(comparison)
+```
+
+As shown in the table above, Random Forest has the highest accuracy (0.8168), followed by Bagging (0.8021).
+
+Boosting has the highest AUC (0.7868), but Random Forest (0.7798) and Decision Tree(0.7820) are close behind.
+
+Given these metrics, **Random Forest** appears to be the best overall classifier as it balances both high accuracy and high AUC. If accuracy is the primary concern, Random Forest would be the preferred choice, while **Decision Tree** might be preferred if maximizing AUC is more important, as it has a higher accuracy than Boosting.
+
+Therefore, there isn't a single "best" classifier across all metrics.
+
+### 8.
+
+Code can be found in Appendix 8.0
+
+```{r echo=FALSE}
+# Attribute importance
+cat("\n#Decision Tree Attribute Importance\n")
+print(summary(PD_clean.tree))
+cat("\n#Bagging Attribute Importance\n")
+print(PD_clean.bag$importance)
+cat("\n#Boosting Attribute Importance\n")
+print(PD_clean.boost$importance)
+cat("\n#Random Forest Attribute Importance\n")
+print(PD_clean.rf$importance)
+```
+
+Decision Tree: Variables actually used in tree construction: "A01", "A23", "A18"
+
+Bagging: The most important variables are "A01", "A18", and "A23".
+
+Boosting: The most important variables are "A01", "A18", and "A22".
+
+Random Forest: The most important variables are "A01", "A18", "A22", and "A23".
+
+In summary, the most important variables across all models are consistently "A01", "A18", and "A23". "A22" is also frequently highlighted as important, especially in the Boosting and Random Forest models.
+
+Variables that consistently show low importance values across all models could potentially be omitted, such as "A02", "A03", "A05", "A06", "A07", "A09", "A10", "A11", "A13", "A14", "A15", "A16", "A17", "A19", "A20", "A21", and "A25", which have either zero or very low importance values in multiple models. They will be less influential in predicting the Class variable and may have minimal impact on model performance.
+
+### 9.
+
+I have chosen Decision trees as they are easy to understand and can be manually followed by hand to classify websites. In terms of performance, decision tree achieved an accuracy of 0.7979 and the highest AUC of 0.7820 among all classifiers. The decision tree uses A01, A18, and A23, which were consistently the most important variables across all models in Q4.
+
+All the codes for the following diagrams and outputs can be found in Appendix 9.0
+
+The decision tree model that is created is as follows:
+
+```{r echo=FALSE}
+library(rpart)
+
+# Fit the decision tree model using the training data
+tree_model <- rpart(Class ~ A01+A18+A23, data = PD_clean.train, method = "class")
+
+# Plot the decision tree
+plot(tree_model)
+text(tree_model, pretty = 1)
+```
+
+With the test data, the performance of the model is as follows:
+
+```{r echo=FALSE}
+# Predict the class labels for the test data
+predicted_labels <- predict(tree_model, PD_clean.test, type = "class")
+
+# Assuming PD_clean.test$Class contains the actual labels
+actual_labels <- PD_clean.test$Class
+
+# Calculate the confusion matrix, accuracy, and other metrics
+confusion_matrix <- table(Predicted = predicted_labels, Actual = actual_labels)
+print(confusion_matrix)
+
+accuracy <- sum(predicted_labels == actual_labels) / length(actual_labels)
+cat("Accuracy:", accuracy, "\n")
+
+
+```
+
+```{r echo=TRUE}
+# Generate predicted probabilities for the ROC curve
+predicted_probabilities <- predict(tree_model, PD_clean.test, type = "prob")[, 2]
+# Calculate the ROC curve
+pred <- prediction(predicted_probabilities, actual_labels)
+perf <- performance(pred, "tpr", "fpr")
+# Calculate the AUC
+auc <- performance(pred, "auc")
+auc_value <- as.numeric(auc@y.values)
+cat("AUC:", auc_value, "\n") 
+#Plot the ROC curve
+plot(perf, col = "blue", main = "ROC Curve for Decision Tree Classifier")
+abline(a = 0, b = 1, lty = 2)
+```
+
+```{r echo=FALSE}
+comparison <- data.frame(
+  Classifier = c("Decision Tree (Q9)", "Decision Tree (Q4)", "Naive Bayes", "Bagging", "Boosting", "Random Forest"),
+  Accuracy = c(accuracy, tree_accuracy, bayes_accuracy, bag_accuracy, boost_accuracy, rf_accuracy),
+  AUC = c(auc_value, PD_cleanDAUC, PD_cleanBAUC, PD_cleanBagAUC, PD_cleanBoostAUC, PD_cleanFAUC))
+
+print(comparison)
+```
+
+For the decision tree that I have built with the attributes that I have selected, it gives the same accuracy as the decision tree in Q4. However, there is a slight difference in AUC. This decision tree has a slightly lower AUC, but overall considered to be a good model.
+
+### 10.
+
+The following is the code and result of the best tree-based classifier that I have created.
+
+```{r echo=TRUE}
+library(caret)
+set.seed(9999)
+train_control <- trainControl(method = "cv", number = 10)
+# Define grid of hyperparameters to search over
+tune_grid <- expand.grid(mtry = c(2, 4, 6, 8, 10))
+# Train Random Forest model with cross-validation
+rf_model <- train(Class ~ ., 
+                  data = PD_clean.train, 
+                  method = "rf",
+                  trControl = train_control,
+                  tuneGrid = tune_grid)
+# Print cross-validation results
+print(rf_model)
+# Get best Random Forest model from cross-validation
+best_rf_model <- rf_model$finalModel
+
+# Evaluate model performance on test data
+rf_predictions <- predict(best_rf_model, newdata = PD_clean.test)
+rf_confusion_matrix <- confusionMatrix(rf_predictions, PD_clean.test$Class)
+print(rf_confusion_matrix)
+# Calculate probabilities
+rf_probabilities <- predict(best_rf_model, newdata = PD_clean.test, type = "prob")
+# Create prediction object
+rf_pred <- prediction(rf_probabilities[, 2], PD_clean.test$Class)
+# Calculate performance measures
+rf_perf <- performance(rf_pred, "tpr", "fpr")
+rf_auc <- performance(rf_pred, "auc")
+rf_auc_value <- rf_auc@y.values[[1]]
+# Print AUC
+print(paste("AUC:", auc_value))
+```
+
+I have selected to improve the Random Forest model back in Q4, as it had the highest accuracy and also a fairly high AUC among the other classifiers.
+
+From the Random Forest model, I have implemented 10-fold cross-validation, I have also done hyperparameter tuning, the identification of the optimal number of variables considered at each split. The model actually uses all available attributes, but identifies the most important ones along the training process.
+
+As a result, the accuracy of the model showed up to be 0.8147, which is almost the same as the previous model, but AUC improved to 0.7875, making the model the classifier model with the greatest AUC.
+
+Comparison can be found below:
+
+```{r echo=FALSE}
+accuracy_value <- rf_confusion_matrix$overall['Accuracy']
+comparison <- data.frame(
+  Classifier = c("Random Forest (Q10)", "Random Forest (Q4)","Decision Tree (Q9)", "Decision Tree (Q4)", "Naive Bayes (Q4)", "Bagging (Q4)", "Boosting (Q4)"),
+  Accuracy = c(accuracy_value,rf_accuracy, accuracy, tree_accuracy, bayes_accuracy, bag_accuracy, boost_accuracy ),
+  AUC = c(rf_auc_value, PD_cleanFAUC,auc_value, PD_cleanDAUC, PD_cleanBAUC, PD_cleanBagAUC, PD_cleanBoostAUC))
+
+print(comparison)
+```
+
+### 11.
+
+To implement the Artificial Neural Network classifier, I have done pre-processing of making a new clean data before splitting them into training and test data, and also implemented normalizations, using scale() as normalization helps in faster convergence and better performance.
+
+**I have selected attributes A01, A18, A22, A23,** based on their importance identified in previous analyses in Q8.
+
+```{r}
+# Load necessary libraries
+library(neuralnet)
+library(caret)
+library(ROCR)
+
+PD_clean <- na.omit(PD)
+
+# Split the data into training and test sets
+train_indices <- sample(1:nrow(PD_clean), 0.8 * nrow(PD_clean))
+PD_clean.train <- PD_clean[train_indices, ]
+PD_clean.test <- PD_clean[-train_indices, ]
+
+# Normalize the feature columns in the training and test sets
+selected_features <- c("A01", "A18", "A22", "A23")
+PD_clean.train[selected_features] <- scale(PD_clean.train[selected_features])
+PD_clean.test[selected_features] <- scale(PD_clean.test[selected_features])
+
+# Train the neural network
+PD_clean.nn <- neuralnet(Class ~ A01 + A18 + A22 + A23, 
+                         data = PD_clean.train,
+                         hidden = 3)
+
+# Predict probabilities
+PD_clean.pred <- compute(PD_clean.nn, PD_clean.test[selected_features])$net.result
+
+# Convert probabilities to binary predictions based on threshold of 0.5
+binary_predictions <- ifelse(PD_clean.pred > 0.5, 1, 0)
+
+# Confusion matrix
+confusion_matrix <- table(observed = PD_clean.test$Class, predicted = binary_predictions)
+print(confusion_matrix)
+
+# Convert confusion matrix to numeric matrix for calculation
+confusion_matrix <- as.matrix(confusion_matrix)
+
+# Calculate accuracy
+ann_accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+print(paste("Accuracy:", round(ann_accuracy, 4)))
+
+# Calculate AUC
+pred_obj <- ROCR::prediction(PD_clean.pred, PD_clean.test$Class)
+perf <- performance(pred_obj, "tpr", "fpr")
+ann_auc <- performance(pred_obj, "auc")@y.values[[1]]
+print(paste("AUC:", round(ann_auc, 4)))
+```
+
+```{r}
+# Plot ROC curve
+plot(perf, main = "ROC Curve for ANN", col = "blue")
+abline(0, 1, col = "red", lty = 2)
+```
+
+In performance wise, the ANN model has an accuracy of 0.7666 and AUC of 0.7963, which is considered to be good, as it has the highest AUC among all other classifiers.
+
+```{r}
+accuracy_value <- rf_confusion_matrix$overall['Accuracy']
+comparison <- data.frame(
+  Classifier = c("Artificial Neural Network","Random Forest (Q10)", "Random Forest (Q4)","Decision Tree (Q9)", "Decision Tree (Q4)", "Naive Bayes (Q4)", "Bagging (Q4)", "Boosting (Q4)"),
+  Accuracy = c(ann_accuracy,accuracy_value,rf_accuracy, accuracy, tree_accuracy, bayes_accuracy, bag_accuracy, boost_accuracy ),
+  AUC = c(ann_auc,rf_auc_value, PD_cleanFAUC,auc_value, PD_cleanDAUC, PD_cleanBAUC, PD_cleanBagAUC, PD_cleanBoostAUC))
+
+print(comparison)
+```
+
+### 12.
+
+I will be implementing Support Vector Machine (SVM) using the **`e1071`** package.
+
+Link to package details: <https://cran.r-project.org/web/packages/e1071/e1071.pdf>
+
+SVM finds the hyperplane that best separates the data into classes. The radial basis function (RBF) kernel, used in this implementation, maps the input space into a higher-dimensional space, allowing the SVM to handle non-linearly separable data.
+
+Similarly, I have done pre-processing of making a new clean data before splitting them into training and test data, and I have selected attributes A01, A18, A22, A23, based on their importance identified in previous analyses in Q8.
+
+```{r}
+# Load necessary libraries
+library(e1071)
+library(ROCR)
+
+PD_clean <- na.omit(PD)
+
+PD_clean$Class <- as.factor(PD_clean$Class)
+
+# Split the data into training and test sets
+train_indices <- sample(1:nrow(PD_clean), 0.8 * nrow(PD_clean))
+PD_clean.train <- PD_clean[train_indices, ]
+PD_clean.test <- PD_clean[-train_indices, ]
+
+# Train the Support Vector Machine model
+svm_model <- svm(Class ~ A01 + A18 + A22 + A23, 
+                 data = PD_clean.train,
+                 kernel = "radial",  
+                 gamma = 0.1,       
+                 cost = 10)          
+
+# Make predictions on the test set
+svm_pred <- predict(svm_model, PD_clean.test)
+
+# Calculate accuracy
+svm_accuracy <- mean(svm_pred == PD_clean.test$Class)
+print(paste("Accuracy:", round(svm_accuracy, 4)))
+
+# Create confusion matrix
+confusion_matrix <- table(observed = PD_clean.test$Class, predicted = svm_pred)
+print(confusion_matrix)
+
+# Create prediction object for ROC curve
+pred_obj <- ROCR::prediction(as.numeric(svm_pred), as.numeric(PD_clean.test$Class))
+
+# Calculate ROC curve and AUC
+perf <- performance(pred_obj, "tpr", "fpr")
+svm_auc <- performance(pred_obj, "auc")@y.values[[1]]
+print(paste("AUC:", round(svm_auc, 4)))
+```
+
+```{r}
+# Plot ROC curve
+plot(perf, main = "ROC Curve for SVM", col = "blue")
+abline(0, 1, col = "red", lty = 2)
+```
+
+In the model, it trains the classifier using the radial basis function (RBF) kernel with specific hyperparameters (gamma = 0.1 and cost = 10).
+
+In performance wise, the SVM model has an accuracy of 0.7697 and AUC of 0.6674, which is considered not too bad.
+
+However, when it comes to the comparison with other classifiers, the SVM model built is not the best:
+
+```{r}
+accuracy_value <- rf_confusion_matrix$overall['Accuracy']
+comparison <- data.frame(
+  Classifier = c("Support Vector Machine","Artificial Neural Network","Random Forest (Q10)", "Random Forest (Q4)","Decision Tree (Q9)", "Decision Tree (Q4)", "Naive Bayes (Q4)", "Bagging (Q4)", "Boosting (Q4)"),
+  Accuracy = c(svm_accuracy,ann_accuracy,accuracy_value,rf_accuracy, accuracy, tree_accuracy, bayes_accuracy, bag_accuracy, boost_accuracy ),
+  AUC = c(svm_auc,ann_auc,rf_auc_value, PD_cleanFAUC,auc_value, PD_cleanDAUC, PD_cleanBAUC, PD_cleanBagAUC, PD_cleanBoostAUC))
+
+print(comparison)
+```
+
+### Appendix
+
+1.0
+
+```{r}
+str(PD)
+```
+
+1.1
+
+```{r}
+# Count the number of rows with any NA values
+na_row_count <- sum(apply(PD, 1, function(row) any(is.na(row))))
+print(na_row_count)
+```
+
+1.2
+
+```{r}
+# Count the number of phishing sites (1)
+phishing_count <- sum(PD$Class== 1)
+# Count the number of legitimate sites (0)
+legitimate_count <- sum(PD$Class == 0)
+
+# Calculate the proportion
+proportion <- phishing_count / legitimate_count
+print(proportion)
+```
+
+1.3
+
+```{r echo=TRUE, paged.print=FALSE}
+# Calculate sd and variance for each attribute
+attribute_sd <- sprintf("%.4f", apply(PD[, -ncol(PD)], 2, sd, na.rm = TRUE))
+attribute_var <- sprintf("%.4f", apply(PD[, -ncol(PD)], 2, var, na.rm = TRUE))
+
+attribute_stats <- data.frame(Attribute = names(PD)[1:(ncol(PD)-1)], sd = attribute_sd, var = attribute_var)
+print(attribute_stats)
+```
+
+5.0
+
+```{r}
+PD_clean.predtree = predict(PD_clean.tree, PD_clean.test, type = "class")
+tree_confusion= table(Predicted_Class = PD_clean.predtree, Actual_Class = PD_clean.test$Class)
+cat("\nDecision Tree Confusion\n")
+print(tree_confusion)
+
+# Accuracy
+tree_accuracy <- sum(diag(tree_confusion)) / sum(tree_confusion)
+print(paste("Accuracy:", round(tree_accuracy, 4)))
+```
+
+7.0
+
+```{r}
+comparison <- data.frame(
+  Classifier = c("Decision Tree", "Naive Bayes", "Bagging", "Boosting", "Random Forest"),
+  Accuracy = c(tree_accuracy, bayes_accuracy, bag_accuracy, boost_accuracy, rf_accuracy),
+  AUC = c(PD_cleanDAUC, PD_cleanBAUC, PD_cleanBagAUC, PD_cleanBoostAUC, PD_cleanFAUC))
+
+print(comparison)
+```
+
+8.0
+
+```{r}
+# Attribute importance
+cat("\n#Decision Tree Attribute Importance\n")
+print(summary(PD_clean.tree))
+cat("\n#Bagging Attribute Importance\n")
+print(PD_clean.bag$importance)
+cat("\n#Boosting Attribute Importance\n")
+print(PD_clean.boost$importance)
+cat("\n#Random Forest Attribute Importance\n")
+print(PD_clean.rf$importance)
+```
+
+9.0
+
+```{r}
+library(rpart)
+
+# Fit the decision tree model using the training data
+tree_model <- rpart(Class ~ A01+A18+A23, data = PD_clean.train, method = "class")
+
+# Plot the decision tree
+plot(tree_model)
+text(tree_model, pretty = 1)
+```
+
+```{r}
+# Predict the class labels for the test data
+predicted_labels <- predict(tree_model, PD_clean.test, type = "class")
+
+# Assuming PD_clean.test$Class contains the actual labels
+actual_labels <- PD_clean.test$Class
+
+# Calculate the confusion matrix, accuracy, and other metrics
+confusion_matrix <- table(Predicted = predicted_labels, Actual = actual_labels)
+print(confusion_matrix)
+
+accuracy <- sum(predicted_labels == actual_labels) / length(actual_labels)
+cat("Accuracy:", accuracy, "\n")
+```
